@@ -48,7 +48,7 @@
 					"name": "Gedämpft"
 				},
 				{
-					"slug": "border",
+					"slug": "line",
 					"color": "#e3dfd6",
 					"name": "Linie"
 				}
