@@ -1,0 +1,50 @@
+# Abhängigkeiten
+node_modules/
+vendor/
+
+# Lokale WordPress-Umgebung (@wordpress/env)
+.wp-env/
+.wp-env-home/
+.wp-env.override.json
+
+# Geheimnisse und lokale Konfiguration
+.env
+.env.*
+!.env.example
+auth.json
+*.pem
+*.key
+id_rsa
+id_ed25519
+
+# Logs und Debug-Ausgaben
+*.log
+npm-debug.log*
+debug.log
+wp-content/debug.log
+
+# Deploy-Status (enthält Dateiliste des letzten Uploads)
+.ftp-deploy-sync-state.json
+
+# Betriebssystem
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+desktop.ini
+
+# Editor und Backups
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*~
+*.swp
+*.swo
+*.bak
+*.tmp
+
+# Datenbank-Dumps
+*.sql
+*.sqlite
+*.sqlite3

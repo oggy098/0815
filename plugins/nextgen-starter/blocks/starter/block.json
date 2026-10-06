@@ -1,0 +1,33 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "nextgen/starter",
+	"version": "1.0.0",
+	"title": "NextGen Starter",
+	"category": "text",
+	"icon": "edit",
+	"description": "Einfacher Textblock als Vorlage.",
+	"keywords": ["nextgen", "starter", "text"],
+	"textdomain": "nextgen-starter",
+	"attributes": {
+		"message": {
+			"type": "string",
+			"default": "Hallo von NextGen Starter."
+		}
+	},
+	"supports": {
+		"html": false,
+		"align": ["wide", "full"],
+		"color": {
+			"background": true,
+			"text": true
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true
+		}
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style.css",
+	"render": "file:./render.php"
+}

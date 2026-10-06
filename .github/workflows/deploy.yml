@@ -1,0 +1,275 @@
+# Lädt nur das eigene Theme und die eigenen Plugins hoch.
+# Andere Themes, andere Plugins, Uploads und wp-config.php liegen
+# ausserhalb der Zielordner und werden nicht angefasst.
+#
+# dangerous-clean-slate bleibt false. Nicht auf true setzen:
+# true würde den gesamten server-dir leeren.
+
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Nur anzeigen, nichts hochladen
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Prüfen
+    runs-on: ubuntu-latest
+    outputs:
+      plugins: ${{ steps.plugins.outputs.plugins }}
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Branch prüfen
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Deployment läuft nur für den Branch main."
+          exit 1
+
+      - name: PHP einrichten
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+
+      - name: PHP-Syntax prüfen
+        run: |
+          set -euo pipefail
+          count=0
+          status=0
+          while IFS= read -r -d '' file; do
+            count=$((count + 1))
+            php -l "$file" || status=1
+          done < <(find themes plugins -type f -name '*.php' -print0)
+          if [ "$count" -eq 0 ]; then
+            echo "::error::Keine PHP-Dateien in themes/ oder plugins/ gefunden."
+            exit 1
+          fi
+          exit "$status"
+
+      - name: Plugin-Ordner ermitteln
+        id: plugins
+        run: |
+          set -euo pipefail
+          list="$(find plugins -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort | grep -E '^nextgen-[A-Za-z0-9._-]+$' || true)"
+          if [ -z "$list" ]; then
+            echo 'plugins=[]' >> "$GITHUB_OUTPUT"
+            echo "Keine Plugins mit Präfix nextgen- gefunden."
+          else
+            json="$(printf '%s\n' "$list" | jq -R -s -c 'split("\n") | map(select(length > 0))')"
+            echo "plugins=${json}" >> "$GITHUB_OUTPUT"
+            echo "Plugins: ${list}"
+          fi
+
+  deploy-theme:
+    name: Theme hochladen
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Theme-Ordner prüfen
+        run: test -f themes/nextgen-base/style.css
+
+      - name: Zugangsdaten prüfen
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_PROTOCOL: ${{ secrets.FTP_PROTOCOL }}
+          REMOTE_WP_PATH: ${{ secrets.REMOTE_WP_PATH }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in FTP_SERVER FTP_USERNAME FTP_PASSWORD FTP_PROTOCOL REMOTE_WP_PATH; do
+            if [ -z "${!name}" ]; then
+              echo "::error::GitHub Secret ${name} fehlt."
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          case "$FTP_PROTOCOL" in
+            ftp|ftps|ftps-legacy) ;;
+            sftp)
+              echo "::error::sftp wird von FTP-Deploy-Action v4 nicht unterstützt. Dafür ist die auskommentierte SSH/rsync-Alternative (Methode B) gedacht."
+              exit 1
+              ;;
+            *)
+              echo "::error::FTP_PROTOCOL muss ftp, ftps oder ftps-legacy sein."
+              exit 1
+              ;;
+          esac
+          case "$REMOTE_WP_PATH" in
+            */) ;;
+            *)
+              echo "::error::REMOTE_WP_PATH muss mit / enden, zum Beispiel public_html/ oder ./"
+              exit 1
+              ;;
+          esac
+
+      # Methode A: FTP/FTPS. Es wird nur dieser eine Ordner synchronisiert.
+      - name: Theme per FTP hochladen
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ${{ secrets.FTP_PROTOCOL }}
+          port: ${{ secrets.FTP_PORT || 21 }}
+          local-dir: ./themes/nextgen-base/
+          server-dir: ${{ secrets.REMOTE_WP_PATH }}wp-content/themes/nextgen-base/
+          dangerous-clean-slate: false
+          dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
+          log-level: standard
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/node_modules/**
+            **/vendor/**
+            **/README.md
+            **/.wp-env.json
+            **/.env
+            **/.env.*
+            **/*.log
+            **/.DS_Store
+            **/Thumbs.db
+
+      # Methode B: SSH + rsync. Nur verwenden, wenn Methode A oben auskommentiert ist.
+      # --delete wirkt ausschliesslich im Zielordner des Themes, nicht auf wp-content
+      # und nicht auf andere Themes. Zielpfad nie auf das WordPress-Wurzelverzeichnis
+      # oder auf wp-content/ setzen.
+      #
+      # - name: Theme per rsync hochladen
+      #   env:
+      #     SSH_HOST: ${{ secrets.SSH_HOST }}
+      #     SSH_USER: ${{ secrets.SSH_USER }}
+      #     SSH_KEY: ${{ secrets.SSH_KEY }}
+      #     REMOTE_WP_PATH: ${{ secrets.REMOTE_WP_PATH }}
+      #   run: |
+      #     set -euo pipefail
+      #     mkdir -p ~/.ssh
+      #     printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+      #     chmod 600 ~/.ssh/deploy_key
+      #     rsync -az --delete \
+      #       --exclude '.git' \
+      #       --exclude '.github' \
+      #       --exclude 'node_modules' \
+      #       --exclude 'vendor' \
+      #       --exclude 'README.md' \
+      #       --exclude '.wp-env.json' \
+      #       --exclude '.env' \
+      #       --exclude '.env.*' \
+      #       --exclude '*.log' \
+      #       -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+      #       themes/nextgen-base/ \
+      #       "${SSH_USER}@${SSH_HOST}:${REMOTE_WP_PATH}wp-content/themes/nextgen-base/"
+
+  deploy-plugins:
+    name: Plugin ${{ matrix.plugin }}
+    needs: [check, deploy-theme]
+    if: needs.check.outputs.plugins != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix:
+        plugin: ${{ fromJson(needs.check.outputs.plugins) }}
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Plugin-Namen prüfen
+        env:
+          PLUGIN: ${{ matrix.plugin }}
+        run: |
+          set -euo pipefail
+          case "$PLUGIN" in
+            nextgen-[A-Za-z0-9._-]*) ;;
+            *)
+              echo "::error::Ungültiger Plugin-Ordner."
+              exit 1
+              ;;
+          esac
+          if ! find "plugins/${PLUGIN}" -type f -name '*.php' | grep -q .; then
+            echo "::error::Im Plugin-Ordner liegt keine PHP-Datei."
+            exit 1
+          fi
+
+      # Methode A: jeder nextgen-*-Ordner landet in seinem eigenen Plugin-Verzeichnis.
+      - name: Plugin per FTP hochladen
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ${{ secrets.FTP_PROTOCOL }}
+          port: ${{ secrets.FTP_PORT || 21 }}
+          local-dir: ./plugins/${{ matrix.plugin }}/
+          server-dir: ${{ secrets.REMOTE_WP_PATH }}wp-content/plugins/${{ matrix.plugin }}/
+          dangerous-clean-slate: false
+          dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
+          log-level: standard
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/node_modules/**
+            **/vendor/**
+            **/README.md
+            **/.wp-env.json
+            **/.env
+            **/.env.*
+            **/*.log
+            **/.DS_Store
+            **/Thumbs.db
+
+      # Methode B für Plugins. Methode A in diesem Job auskommentieren, wenn du rsync nutzt.
+      # --delete bleibt auf diesen einen Plugin-Ordner beschränkt.
+      #
+      # - name: Plugin per rsync hochladen
+      #   env:
+      #     SSH_HOST: ${{ secrets.SSH_HOST }}
+      #     SSH_USER: ${{ secrets.SSH_USER }}
+      #     SSH_KEY: ${{ secrets.SSH_KEY }}
+      #     REMOTE_WP_PATH: ${{ secrets.REMOTE_WP_PATH }}
+      #     PLUGIN: ${{ matrix.plugin }}
+      #   run: |
+      #     set -euo pipefail
+      #     mkdir -p ~/.ssh
+      #     printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+      #     chmod 600 ~/.ssh/deploy_key
+      #     rsync -az --delete \
+      #       --exclude '.git' \
+      #       --exclude '.github' \
+      #       --exclude 'node_modules' \
+      #       --exclude 'vendor' \
+      #       --exclude 'README.md' \
+      #       --exclude '.wp-env.json' \
+      #       --exclude '.env' \
+      #       --exclude '.env.*' \
+      #       --exclude '*.log' \
+      #       -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+      #       "plugins/${PLUGIN}/" \
+      #       "${SSH_USER}@${SSH_HOST}:${REMOTE_WP_PATH}wp-content/plugins/${PLUGIN}/"
