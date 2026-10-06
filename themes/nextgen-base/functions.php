@@ -37,6 +37,15 @@ add_action(
 	}
 );
 
+add_filter(
+	'document_title_parts',
+	static function ( array $parts ): array {
+		unset( $parts['tagline'] );
+
+		return $parts;
+	}
+);
+
 add_action(
 	'init',
 	static function (): void {

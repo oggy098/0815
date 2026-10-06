@@ -64,6 +64,11 @@
 					"slug": "system",
 					"name": "System",
 					"fontFamily": "ui-sans-serif, system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", \"Liberation Sans\", sans-serif"
+				},
+				{
+					"slug": "mono",
+					"name": "Mono",
+					"fontFamily": "ui-monospace, \"Cascadia Code\", \"Segoe UI Mono\", \"Liberation Mono\", Menlo, Consolas, monospace"
 				}
 			],
 			"fontSizes": [
