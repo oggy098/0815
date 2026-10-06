@@ -16,7 +16,7 @@
 					"name": "Akzent"
 				},
 				{
-					"slug": "background",
+					"slug": "canvas",
 					"color": "#12151a",
 					"name": "Hintergrund"
 				},
@@ -26,7 +26,7 @@
 					"name": "Fläche"
 				},
 				{
-					"slug": "text",
+					"slug": "ink",
 					"color": "#f4f1ea",
 					"name": "Text"
 				},

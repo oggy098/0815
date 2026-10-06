@@ -28,7 +28,7 @@
 					"name": "Akzent"
 				},
 				{
-					"slug": "background",
+					"slug": "canvas",
 					"color": "#f7f6f3",
 					"name": "Hintergrund"
 				},
@@ -38,7 +38,7 @@
 					"name": "Fläche"
 				},
 				{
-					"slug": "text",
+					"slug": "ink",
 					"color": "#1a2332",
 					"name": "Text"
 				},
@@ -166,8 +166,8 @@
 	},
 	"styles": {
 		"color": {
-			"background": "var(--wp--preset--color--background)",
-			"text": "var(--wp--preset--color--text)"
+			"background": "var(--wp--preset--color--canvas)",
+			"text": "var(--wp--preset--color--ink)"
 		},
 		"typography": {
 			"fontFamily": "var(--wp--preset--font-family--system)",
@@ -225,7 +225,7 @@
 			"button": {
 				"color": {
 					"background": "var(--wp--preset--color--primary)",
-					"text": "var(--wp--preset--color--background)"
+					"text": "var(--wp--preset--color--canvas)"
 				},
 				"border": {
 					"radius": "2px"
@@ -245,13 +245,13 @@
 				":hover": {
 					"color": {
 						"background": "var(--wp--preset--color--accent)",
-						"text": "var(--wp--preset--color--background)"
+						"text": "var(--wp--preset--color--canvas)"
 					}
 				},
 				":focus": {
 					"color": {
 						"background": "var(--wp--preset--color--accent)",
-						"text": "var(--wp--preset--color--background)"
+						"text": "var(--wp--preset--color--canvas)"
 					}
 				}
 			}
