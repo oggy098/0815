@@ -308,6 +308,16 @@
 			"name": "footer",
 			"title": "Fusszeile",
 			"area": "footer"
+		},
+		{
+			"name": "dashboard-header",
+			"title": "Dashboard-Kopfzeile",
+			"area": "header"
+		},
+		{
+			"name": "dashboard-footer",
+			"title": "Dashboard-Fusszeile",
+			"area": "footer"
 		}
 	]
 }

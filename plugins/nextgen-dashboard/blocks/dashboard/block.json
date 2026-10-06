@@ -1,0 +1,19 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "nextgen/dashboard",
+	"version": "1.0.0",
+	"title": "NextGen Dashboard",
+	"category": "widgets",
+	"icon": "grid-view",
+	"description": "Persönliches Control-Panel mit Systemkacheln.",
+	"keywords": ["nextgen", "dashboard"],
+	"textdomain": "nextgen-dashboard",
+	"supports": {
+		"html": false,
+		"multiple": false,
+		"reusable": false
+	},
+	"editorScript": "file:./index.js",
+	"render": "file:./render.php"
+}
